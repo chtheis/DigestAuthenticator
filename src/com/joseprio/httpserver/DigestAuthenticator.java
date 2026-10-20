@@ -2,7 +2,7 @@ package com.joseprio.httpserver;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
+import java.security.SecureRandom;
 import java.util.*;
 import java.io.UnsupportedEncodingException;
 
@@ -40,6 +40,9 @@ public abstract class DigestAuthenticator extends Authenticator {
     
     private Set<String> previousHashes = new HashSet<String>();
     private Deque<String> previousHashesStack = new ArrayDeque<String>();
+
+    // Source for the random part of the nonce; must not be predictable
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     /**
      * Creates a DigestAuthenticator for the given HTTP realm
@@ -152,6 +155,10 @@ public abstract class DigestAuthenticator extends Authenticator {
     }
     
     private boolean validateNonce(String nonce) {
+    	// A request without nonce is not valid (and must not throw)
+    	if (nonce == null) {
+    		return false;
+    	}
     	String[] parts = nonce.split(":");
     	// Must have 2 parts
     	if (parts.length != 2) {
@@ -205,9 +212,8 @@ public abstract class DigestAuthenticator extends Authenticator {
      */
     public String calculateNonce() {
     	long currentTime = System.currentTimeMillis();
-        Random rand = new Random(100000);
-        Integer randomInt = rand.nextInt();
-        return "" + currentTime + ":" + calculateMD5(randomInt.toString());
+        long randomValue = RANDOM.nextLong();
+        return "" + currentTime + ":" + calculateMD5(Long.toString(randomValue));
     }
     
     private String getOpaque(String domain, String nonce) {
@@ -220,7 +226,7 @@ public abstract class DigestAuthenticator extends Authenticator {
 
         header = 
         		"Digest realm=\"" + realm + "\","
-        		+ "qop=auth,"
+        		+ "qop=\"auth\","
         		+ "nonce=\"" + nonce + "\","
         		+ "opaque=\"" + getOpaque(realm, nonce) + "\"";
 
